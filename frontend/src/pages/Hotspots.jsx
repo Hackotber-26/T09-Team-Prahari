@@ -1,18 +1,36 @@
 import { useMemo, useState } from 'react'
 import { MapPin, Search, ShieldAlert, Target } from 'lucide-react'
-import { mapHotspots } from '../data/mapSample'
 
 const filters = ['All priorities', 'High', 'Medium', 'Low']
 
-export default function Hotspots() {
+export default function Hotspots({ hotspots = [], reports = [], loading = false }) {
   const [query, setQuery] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('All priorities')
-  const [selectedId, setSelectedId] = useState(mapHotspots[0]?.id)
+  const [selectedId, setSelectedId] = useState(null)
+  const reportsById = useMemo(
+    () => new Map(reports.map((report) => [report.id, report])),
+    [reports],
+  )
 
   const filteredHotspots = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
 
-    return mapHotspots.filter((hotspot) => {
+    return hotspots.map((hotspot) => {
+      const associatedReport = reportsById.get(hotspot.report_ids[0])
+      return {
+        ...hotspot,
+        id: hotspot.cluster_id,
+        name: associatedReport?.location || (hotspot.is_noise ? 'Isolated report' : `Cluster ${hotspot.cluster_id + 1}`),
+        priority: hotspot.risk_classification,
+        reports: hotspot.report_count,
+        score: hotspot.risk_score,
+        lat: hotspot.latitude,
+        lng: hotspot.longitude,
+        action: hotspot.is_noise
+          ? 'This report is isolated from other reports within the current clustering radius.'
+          : 'Review the reports and consider a local road-safety assessment.',
+      }
+    }).filter((hotspot) => {
       const matchesPriority = priorityFilter === 'All priorities' || hotspot.priority === priorityFilter
       const matchesQuery =
         !normalizedQuery ||
@@ -21,7 +39,7 @@ export default function Hotspots() {
 
       return matchesPriority && matchesQuery
     })
-  }, [priorityFilter, query])
+  }, [hotspots, reportsById, priorityFilter, query])
 
   const selectedHotspot =
     filteredHotspots.find((hotspot) => hotspot.id === selectedId) ?? filteredHotspots[0]
@@ -36,7 +54,7 @@ export default function Hotspots() {
         </div>
         <div className="hotspot-zone-count">
           <MapPin size={17} />
-          <span>{mapHotspots.length} monitored zones</span>
+          <span>{hotspots.filter((hotspot) => !hotspot.is_noise).length} monitored clusters</span>
         </div>
       </div>
 
@@ -69,11 +87,13 @@ export default function Hotspots() {
           </div>
 
           <div className="hotspot-results-label">
-            <span>Risk zones</span>
+            <span>Hotspots and isolated reports</span>
             <span>{filteredHotspots.length} results</span>
           </div>
 
-          {filteredHotspots.length > 0 ? (
+          {loading && filteredHotspots.length === 0 ? (
+            <div className="hotspot-empty" role="status">Loading hotspot data…</div>
+          ) : filteredHotspots.length > 0 ? (
             <ul className="hotspot-explorer-list">
               {filteredHotspots.map((hotspot) => (
                 <li key={hotspot.id}>
@@ -120,7 +140,9 @@ export default function Hotspots() {
             </div>
 
             <h2>{selectedHotspot.name}</h2>
-            <p className="hotspot-detail-description">Near-miss activity cluster</p>
+            <p className="hotspot-detail-description">
+              {selectedHotspot.is_noise ? 'This report is outside a detected cluster' : 'Near-miss activity cluster'}
+            </p>
 
             <div className="hotspot-detail-location">
               <MapPin size={16} />
@@ -133,6 +155,16 @@ export default function Hotspots() {
               <div className="hotspot-metric">
                 <span className="hotspot-metric-label">Reported incidents</span>
                 <strong>{selectedHotspot.reports}</strong>
+              </div>
+              <div className="hotspot-metrics">
+                <div className="hotspot-metric">
+                  <span className="hotspot-metric-label">Average severity</span>
+                  <strong>{selectedHotspot.average_severity.toFixed(1)} / 5</strong>
+                </div>
+                <div className="hotspot-metric">
+                  <span className="hotspot-metric-label">Evidence available</span>
+                  <strong>{Math.round(selectedHotspot.evidence_ratio * 100)}%</strong>
+                </div>
               </div>
               <div className="hotspot-metric">
                 <span className="hotspot-metric-label">Risk score</span>
@@ -165,6 +197,9 @@ export default function Hotspots() {
                 <ShieldAlert size={17} />
                 <strong>Recommended action</strong>
               </div>
+              <p className="risk-disclaimer">
+                Experimental prioritization score only—not a validated accident probability or official safety standard.
+              </p>
               <p>{selectedHotspot.action}</p>
             </div>
           </aside>

@@ -1,0 +1,7 @@
+"""Compatibility entry point for the backend root-level demo seeder."""
+
+from seed_demo import main
+
+
+if __name__ == "__main__":
+    main()

@@ -9,7 +9,7 @@ import {
 } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { getReportCoordinates, groupReportsByProximity } from '../utils/reportGeo'
+import { getReportCoordinates } from '../utils/reportGeo'
 import { formatSeverity } from '../utils/reportDisplay'
 
 const priorityColors = {
@@ -41,17 +41,20 @@ function MapBounds({ locations }) {
   return null
 }
 
-export default function MapView({ reports = [] }) {
-  const hotspots = useMemo(
-    () => groupReportsByProximity(reports),
-    [reports]
+export default function MapView({ reports = [], hotspots = [] }) {
+  const clusteredHotspots = useMemo(
+    () => hotspots.filter((hotspot) => !hotspot.is_noise),
+    [hotspots],
   )
   const boundsLocations = useMemo(
-    () => hotspots.map(({ latitude, longitude }) => ({ latitude, longitude })),
-    [hotspots]
+    () => [
+      ...reports.map(getReportCoordinates).filter(Boolean),
+      ...hotspots.map(({ latitude, longitude }) => ({ latitude, longitude })),
+    ],
+    [hotspots, reports],
   )
 
-  const defaultCenter = [20, 0]
+  const defaultCenter = [12.9716, 77.5946]
 
   const center = boundsLocations.length
     ? [boundsLocations[0].latitude, boundsLocations[0].longitude]
@@ -77,7 +80,7 @@ export default function MapView({ reports = [] }) {
           ))}
       </div>
 
-      {!hotspots.length && (
+      {!reports.length && (
         <p className="map-empty" role="status">
           No reports with valid locations yet. Add a report to see it on the map.
         </p>
@@ -95,14 +98,17 @@ export default function MapView({ reports = [] }) {
 
         <MapBounds locations={boundsLocations} />
 
-        {hotspots.map((hotspot) => {
-          const color = priorityColors[hotspot.priority] || priorityColors.Unclassified
+        {clusteredHotspots.map((hotspot) => {
+          const color = priorityColors[hotspot.risk_classification] || priorityColors.Unclassified
+          const associatedReports = reports.filter((report) =>
+            hotspot.report_ids.includes(report.id)
+          )
 
           return (
             <CircleMarker
-              key={hotspot.id}
+              key={`hotspot-${hotspot.cluster_id}`}
               center={[hotspot.latitude, hotspot.longitude]}
-              radius={Math.min(9 + hotspot.reports.length * 2, 20)}
+              radius={Math.min(10 + hotspot.report_count, 20)}
               pathOptions={{
                 color,
                 fillColor: color,
@@ -113,18 +119,20 @@ export default function MapView({ reports = [] }) {
               <Popup>
                 <div className="map-popup">
                   <h3>
-                    {hotspot.reports[0].location ||
-                      hotspot.reports[0].locationName ||
+                    {associatedReports[0]?.location ||
+                      associatedReports[0]?.locationName ||
                       'Reported location'}
                   </h3>
-                  <p><strong>Reports:</strong> {hotspot.reports.length}</p>
-                  <p><strong>Priority:</strong> {hotspot.priority}</p>
+                  <p><strong>Reports:</strong> {hotspot.report_count}</p>
+                  <p><strong>Risk:</strong> {hotspot.risk_classification} · {hotspot.risk_score}/100</p>
+                  <p><strong>Average severity:</strong> {hotspot.average_severity.toFixed(1)}/5</p>
                   <p><strong>Incident types:</strong></p>
                   <ul>
-                    {[...new Set(hotspot.reports.map((report) =>
+                    {[...new Set(associatedReports.map((report) =>
                       report.incidentType || report.type || 'Other'
                     ))].map((type) => <li key={type}>{type}</li>)}
                   </ul>
+                  <p><strong>Report IDs:</strong> {hotspot.report_ids.join(', ')}</p>
                   <p><strong>Coordinates:</strong> {hotspot.latitude.toFixed(5)}, {hotspot.longitude.toFixed(5)}</p>
                 </div>
               </Popup>
@@ -135,6 +143,7 @@ export default function MapView({ reports = [] }) {
         {reports.map((report) => {
           const point = getReportCoordinates(report)
           const coordinates = point ? [point.latitude, point.longitude] : null
+          const reportHotspot = hotspots.find((item) => item.report_ids.includes(report.id))
           if (!coordinates) return null
 
           return (
@@ -154,6 +163,25 @@ export default function MapView({ reports = [] }) {
                   <h3>{report.location || report.locationName || 'Near-miss report'}</h3>
                   <p><strong>Type:</strong> {report.incidentType || report.type || 'Other'}</p>
                   <p><strong>Severity:</strong> {formatSeverity(report.severityLevel || report.severity)}</p>
+                  <p><strong>Risk class:</strong> {reportHotspot?.is_noise
+                    ? `${reportHotspot.risk_classification} · isolated`
+                    : reportHotspot?.risk_classification || 'Not clustered'}</p>
+                  {report.description && <p>{report.description}</p>}
+                  {report.attachments?.length > 0 && (
+                    <div className="map-popup-evidence">
+                      <strong>Evidence files ({report.attachments.length})</strong>
+                      {report.attachments.map((attachment) => (
+                        <a
+                          href={attachment.url}
+                          key={attachment.id}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          {attachment.name}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                   <p><strong>Coordinates:</strong> {coordinates[0].toFixed(5)}, {coordinates[1].toFixed(5)}</p>
                 </div>
               </Popup>
