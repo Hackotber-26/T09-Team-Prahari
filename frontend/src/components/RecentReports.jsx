@@ -30,9 +30,7 @@ export default function RecentReports({ reports = [] }) {
               report.priority || report.severityLevel || report.severity
             )
             const priorityClass =
-              severity.toLowerCase() === 'critical'
-                ? 'critical'
-                : severityClass(severity)
+              severity.toLowerCase() === 'critical' ? 'critical' : severityClass(severity)
 
             return (
               <article

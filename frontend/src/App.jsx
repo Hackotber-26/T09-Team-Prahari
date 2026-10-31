@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 
 import Navbar from './components/Navbar'
 import Sidebar from './components/Sidebar'
@@ -26,6 +26,13 @@ export default function App() {
       id: report.id ?? index + 1,
     }))
   )
+  const [submissionNotice, setSubmissionNotice] = useState(false)
+
+  useEffect(() => {
+    if (!submissionNotice) return undefined
+    const timeoutId = setTimeout(() => setSubmissionNotice(false), 6000)
+    return () => clearTimeout(timeoutId)
+  }, [submissionNotice])
 
   // Add a newly submitted report
   const addReport = useCallback((report) => {
@@ -47,6 +54,7 @@ export default function App() {
     })
 
     // Navigate to dashboard after submission
+    setSubmissionNotice(true)
     setPage('dashboard')
   }, [])
 
@@ -59,7 +67,7 @@ export default function App() {
   const renderPage = () => {
     switch (page) {
       case 'dashboard':
-        return <Dashboard reports={reports} />
+        return <Dashboard reports={reports} submissionNotice={submissionNotice} />
 
       case 'reports':
         return <Reports reports={reports} />

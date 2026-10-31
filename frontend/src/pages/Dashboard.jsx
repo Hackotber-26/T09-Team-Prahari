@@ -4,7 +4,7 @@ import MapView from '../components/MapView'
 import RecentReports from '../components/RecentReports'
 import HotspotOverview from '../components/HotspotOverview'
 import { isToday } from '../utils/reportDisplay'
-import { mapHotspots } from '../data/mapSample'
+import { getReportCoordinates, groupReportsByProximity } from '../utils/reportGeo'
 import {
   FileText,
   MapPin,
@@ -12,24 +12,14 @@ import {
   CalendarDays,
 } from 'lucide-react'
 
-export default function Dashboard({ reports = [] }) {
+export default function Dashboard({ reports = [], submissionNotice = false }) {
   const validReports = Array.isArray(reports) ? reports : []
 
-  const validCoordinates = validReports.filter((report) => {
-    const lat = Number(report.lat)
-    const lng = Number(report.lng)
-
-    return (
-      Number.isFinite(lat) &&
-      Number.isFinite(lng) &&
-      lat >= -90 &&
-      lat <= 90 &&
-      lng >= -180 &&
-      lng <= 180
-    )
-  })
-
-  const highPriorityCount = mapHotspots.filter((hotspot) =>
+  const validCoordinates = validReports.filter((report) =>
+    getReportCoordinates(report)
+  )
+  const hotspots = groupReportsByProximity(validCoordinates)
+  const highPriorityCount = hotspots.filter((hotspot) =>
     ['High', 'Critical'].includes(hotspot.priority)
   ).length
 
@@ -43,8 +33,8 @@ export default function Dashboard({ reports = [] }) {
     },
     {
       label: 'Active Hotspots',
-      value: mapHotspots.length,
-      subtitle: 'Sample risk clusters',
+      value: hotspots.length,
+      subtitle: 'Clusters from reported locations',
       icon: MapPin,
       color: 'purple',
     },
@@ -86,6 +76,12 @@ export default function Dashboard({ reports = [] }) {
         </div>
       </section>
 
+      {submissionNotice && (
+        <div className="dashboard-submission-notice" role="status">
+          <strong>Report received.</strong> It has been added to the dashboard and map.
+        </div>
+      )}
+
       <section className="stat-grid">
         {cards.map((card, index) => (
           <StatCard
@@ -119,7 +115,7 @@ export default function Dashboard({ reports = [] }) {
         </div>
 
         <div className="dashboard-panel">
-          <HotspotOverview />
+          <HotspotOverview reports={validCoordinates} />
         </div>
       </section>
     </div>

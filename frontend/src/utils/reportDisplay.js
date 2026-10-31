@@ -1,4 +1,4 @@
-const severityLabels = ['', 'Very Low', 'Low', 'Moderate', 'High', 'Very High']
+const severityLabels = ['', 'Low', 'Minor', 'Moderate', 'High', 'Critical']
 
 export function formatSeverity(severity) {
   const numericSeverity = Number(severity)
@@ -11,7 +11,7 @@ export function formatSeverity(severity) {
 export function severityClass(severity) {
   const label = formatSeverity(severity).toLowerCase()
   if (label === 'critical' || label === 'high' || label === 'very high') return 'high'
-  if (label === 'medium' || label === 'moderate') return 'medium'
+  if (label === 'medium' || label === 'moderate' || label === 'minor') return 'medium'
   return 'low'
 }
 

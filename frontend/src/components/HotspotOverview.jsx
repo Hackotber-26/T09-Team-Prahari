@@ -1,15 +1,15 @@
 
-import { mapHotspots } from '../data/mapSample'
+import { groupReportsByProximity } from '../utils/reportGeo'
 
-export default function HotspotOverview() {
-  const hotspots = mapHotspots
+export default function HotspotOverview({ reports = [] }) {
+  const hotspots = groupReportsByProximity(reports)
 
   return (
     <section className="hotspot-overview">
       <div className="panel-heading">
         <div>
           <h2>Hotspot Overview</h2>
-          <p>Sample risk clusters shown on the map</p>
+          <p>Clusters grouped from reported locations</p>
         </div>
       </div>
 
@@ -32,9 +32,14 @@ export default function HotspotOverview() {
               </div>
 
               <div className="hotspot-info">
-                <h3>{hotspot.name}</h3>
+                <h3>
+                  {hotspot.reports[0].location ||
+                    hotspot.reports[0].locationName ||
+                    'Reported location'}
+                </h3>
                 <p>
-                  Risk score {hotspot.score}
+                  {hotspot.reports.length}{' '}
+                  {hotspot.reports.length === 1 ? 'report' : 'reports'}
                 </p>
               </div>
 
@@ -43,7 +48,7 @@ export default function HotspotOverview() {
               </span>
 
               <div className="hotspot-count">
-                {hotspot.reports}
+                {hotspot.reports.length}
               </div>
             </article>
           ))}
