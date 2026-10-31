@@ -7,6 +7,8 @@ pydantic-core==2.50.2
 pydantic-settings==2.16.2
 python-dotenv==1.2.4
 python-multipart==0.0.32
-httpx2==2.16.0
+httpx==0.28.1
+scikit-learn==1.9.1
+sentence-transformers==6.2.0
 pytest==9.2.0
 pytest-asyncio==1.4.1

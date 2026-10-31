@@ -1,3 +1,3 @@
-from app.models.report import Report
+from app.models.report import EvidenceAttachment, Report
 
-__all__ = ["Report"]
+__all__ = ["EvidenceAttachment", "Report"]

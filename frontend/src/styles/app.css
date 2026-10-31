@@ -324,6 +324,8 @@ body { background: var(--bg); color: var(--text); font-family: system-ui, 'Segoe
   font-size: 12px;
   margin-bottom: 5px;
 }
+.map-popup-evidence { display: flex; flex-direction: column; gap: 5px; margin: 8px 0; font-size: 11px; }
+.map-popup-evidence a { color: #0284c7; overflow-wrap: anywhere; }
 
 /* Bottom panels */
 
@@ -937,6 +939,18 @@ body { background: var(--bg); color: var(--text); font-family: system-ui, 'Segoe
 .review-summary strong, .review-summary p { margin: 0; color: #e2e8f0; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .local-only-note { display: flex; align-items: flex-start; gap: 8px; color: #fcd34d; font-size: 10px; line-height: 1.6; }
 .local-only-note svg { flex: 0 0 auto; }
+
+.backend-status { margin: 0 0 16px; padding: 10px 14px; border: 1px solid rgba(56, 189, 248, .3); border-radius: 10px; color: #bae6fd; background: rgba(14, 116, 144, .12); font-size: 13px; }
+.backend-status.error { border-color: rgba(248, 113, 113, .4); color: #fecaca; background: rgba(127, 29, 29, .18); }
+.report-evidence-download { display: block; margin-top: 6px; color: #7dd3fc; font-size: 12px; overflow-wrap: anywhere; }
+.report-evidence-item { margin-top: 8px; }
+.report-evidence-preview { display: block; width: min(100%, 220px); max-height: 150px; object-fit: cover; border: 1px solid var(--border); border-radius: 7px; }
+.upload-progress { display: grid; gap: 7px; margin: 10px 0; color: #bae6fd; font-size: 11px; }
+.upload-progress progress { width: 100%; height: 8px; accent-color: var(--primary); }
+.semantic-results { margin-top: 10px; padding: 10px; border-radius: 8px; background: rgba(14, 116, 144, .12); font-size: 12px; }
+.semantic-results p { margin: 7px 0; line-height: 1.5; }
+.semantic-results small, .risk-disclaimer { color: #aab8ca; font-size: 11px; line-height: 1.5; }
+.risk-disclaimer { margin-top: 14px; }
 .review-actions { padding: 12px 0 0; }
 .incident-form :focus-visible, .incident-page button:focus-visible, .review-dialog button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .dashboard-submission-notice { margin: -10px 0 20px; padding: 12px 14px; color: #86efac; background: rgba(34,197,94,.08); border: 1px solid rgba(34,197,94,.25); border-radius: 9px; font-size: 12px; animation: cardReveal .25s ease both; }

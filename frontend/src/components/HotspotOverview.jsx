@@ -1,8 +1,7 @@
 
-import { groupReportsByProximity } from '../utils/reportGeo'
-
-export default function HotspotOverview({ reports = [] }) {
-  const hotspots = groupReportsByProximity(reports)
+export default function HotspotOverview({ reports = [], hotspots = [] }) {
+  const clusters = hotspots.filter((hotspot) => !hotspot.is_noise)
+  const reportById = new Map(reports.map((report) => [report.id, report]))
 
   return (
     <section className="hotspot-overview">
@@ -13,16 +12,18 @@ export default function HotspotOverview({ reports = [] }) {
         </div>
       </div>
 
-      {hotspots.length === 0 ? (
+      {clusters.length === 0 ? (
         <div className="panel-empty">
           Hotspot information will appear after reports are submitted.
         </div>
       ) : (
         <div className="hotspot-list">
-          {hotspots.map((hotspot, index) => (
+          {clusters.map((hotspot, index) => {
+            const firstReport = reportById.get(hotspot.report_ids[0])
+            return (
             <article
               className="hotspot-item"
-              key={hotspot.id}
+              key={hotspot.cluster_id}
               style={{
                 animationDelay: `${index * 100}ms`,
               }}
@@ -33,25 +34,22 @@ export default function HotspotOverview({ reports = [] }) {
 
               <div className="hotspot-info">
                 <h3>
-                  {hotspot.reports[0].location ||
-                    hotspot.reports[0].locationName ||
+                  {firstReport?.location ||
+                    firstReport?.locationName ||
                     'Reported location'}
                 </h3>
-                <p>
-                  {hotspot.reports.length}{' '}
-                  {hotspot.reports.length === 1 ? 'report' : 'reports'}
-                </p>
+                <p>{hotspot.report_count} reports · Risk {hotspot.risk_score}/100</p>
               </div>
 
-              <span className={`prio-badge ${hotspot.priority.toLowerCase()}`}>
-                {hotspot.priority}
+              <span className={`prio-badge ${hotspot.risk_classification.toLowerCase()}`}>
+                {hotspot.risk_classification}
               </span>
 
               <div className="hotspot-count">
-                {hotspot.reports.length}
+                {hotspot.report_count}
               </div>
             </article>
-          ))}
+          )})}
         </div>
       )}
     </section>

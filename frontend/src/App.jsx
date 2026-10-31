@@ -1,32 +1,73 @@
-
-import { useState, useCallback, useEffect } from 'react'
-
+import { useCallback, useEffect, useState } from 'react'
 import Navbar from './components/Navbar'
 import Sidebar from './components/Sidebar'
-
 import Dashboard from './pages/Dashboard'
 import Reports from './pages/Reports'
 import Hotspots from './pages/Hotspots'
 import About from './pages/About'
 import ReportIncident from './pages/ReportIncident'
-
-import { mapReports } from './data/mapSample'
-
+import { ApiError, createReport, getHotspots, getReports } from './services/api'
 import './styles/app.css'
 
 export default function App() {
-  // Current navigation page
   const [page, setPage] = useState('dashboard')
-
-  // Shared report data
-  // Dashboard, Reports and MapView use this same state.
-  const [reports, setReports] = useState(() =>
-    mapReports.map((report, index) => ({
-      ...report,
-      id: report.id ?? index + 1,
-    }))
-  )
+  const [reports, setReports] = useState([])
+  const [hotspots, setHotspots] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [backendError, setBackendError] = useState('')
   const [submissionNotice, setSubmissionNotice] = useState(false)
+
+  const requestData = useCallback(async () => {
+    const [nextReports, hotspotResponse] = await Promise.all([
+      getReports(),
+      getHotspots(),
+    ])
+    return { nextReports, nextHotspots: hotspotResponse.hotspots }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    requestData()
+      .then(({ nextReports, nextHotspots }) => {
+        if (!active) return
+        setReports(nextReports)
+        setHotspots(nextHotspots)
+        setBackendError('')
+      })
+      .catch((error) => {
+        if (active) {
+          setBackendError(
+            error instanceof ApiError
+              ? error.message
+              : 'Unable to load reports from the backend.',
+          )
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [requestData])
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    setBackendError('')
+    try {
+      const { nextReports, nextHotspots } = await requestData()
+      setReports(nextReports)
+      setHotspots(nextHotspots)
+    } catch (error) {
+      setBackendError(
+        error instanceof ApiError
+          ? error.message
+          : 'Unable to load reports from the backend.',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [requestData])
 
   useEffect(() => {
     if (!submissionNotice) return undefined
@@ -34,70 +75,59 @@ export default function App() {
     return () => clearTimeout(timeoutId)
   }, [submissionNotice])
 
-  // Add a newly submitted report
-  const addReport = useCallback((report) => {
-    setReports((previousReports) => {
-      const nextId =
-        previousReports.reduce(
-          (highest, current) =>
-            Math.max(highest, Number(current.id) || 0),
-          0
-        ) + 1
-
-      return [
-        ...previousReports,
-        {
-          ...report,
-          id: nextId,
-        },
-      ]
-    })
-
-    // Navigate to dashboard after submission
+  const addReport = useCallback(async (report, onUploadProgress) => {
+    const savedReport = await createReport(report, report.submissionKey, onUploadProgress)
+    setReports((current) => [
+      savedReport,
+      ...current.filter((item) => item.id !== savedReport.id),
+    ])
     setSubmissionNotice(true)
     setPage('dashboard')
-  }, [])
 
-  // Navigation handler
-  const handlePageChange = useCallback((nextPage) => {
-    setPage(nextPage)
-  }, [])
-
-  // Render the selected page
-  const renderPage = () => {
-    switch (page) {
-      case 'dashboard':
-        return <Dashboard reports={reports} submissionNotice={submissionNotice} />
-
-      case 'reports':
-        return <Reports reports={reports} />
-
-      case 'hotspots':
-        return <Hotspots />
-
-      case 'about':
-        return <About />
-
-      case 'report':
-        return <ReportIncident onAdd={addReport} />
-
-      default:
-        return <Dashboard reports={reports} />
+    try {
+      const hotspotResponse = await getHotspots()
+      setHotspots(hotspotResponse.hotspots)
+      setBackendError('')
+    } catch (error) {
+      setBackendError(
+        `Report ${savedReport.id} was saved, but hotspot data could not be refreshed: ${error.message}`,
+      )
     }
+    return savedReport
+  }, [])
+
+  const pages = {
+    dashboard: (
+      <Dashboard
+        reports={reports}
+        hotspots={hotspots}
+        loading={loading}
+        backendError={backendError}
+        submissionNotice={submissionNotice}
+      />
+    ),
+    reports: <Reports reports={reports} loading={loading} backendError={backendError} />,
+    hotspots: <Hotspots hotspots={hotspots} reports={reports} loading={loading} backendError={backendError} />,
+    about: <About />,
+    report: <ReportIncident onAdd={addReport} />,
   }
 
   return (
     <div className="app-shell">
       <Navbar page={page} />
-
       <div className="app-body">
-        <Sidebar
-          active={page}
-          onSelect={handlePageChange}
-        />
-
+        <Sidebar active={page} onSelect={setPage} />
         <main className="app-main">
-          {renderPage()}
+          {loading && <p className="backend-status" role="status">Loading reports and hotspot data…</p>}
+          {backendError && (
+            <p className="backend-status error" role="alert">
+              {backendError}
+              <button type="button" className="text-action" onClick={() => void loadData()}>
+                Retry connection
+              </button>
+            </p>
+          )}
+          {pages[page]}
         </main>
       </div>
     </div>

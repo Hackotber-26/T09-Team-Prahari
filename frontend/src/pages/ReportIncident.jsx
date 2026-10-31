@@ -4,10 +4,8 @@ import {
   Check,
   CheckCircle2,
   Crosshair,
-  FileAudio,
   FileImage,
   FileText,
-  FileVideo,
   MapPin,
   Search,
   Send,
@@ -40,6 +38,8 @@ const severityLabels = {
   5: 'Critical',
 }
 const MAX_FILE_SIZE = 25 * 1024 * 1024
+const MAX_ATTACHMENTS = 10
+const ALLOWED_FILE_EXTENSIONS = new Set(['jpeg', 'jpg', 'pdf', 'png', 'webp'])
 const SEARCH_DELAY_MS = 850
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org'
 const initialForm = { location: '', type: '', severity: '3', description: '' }
@@ -141,10 +141,9 @@ function LocationMap({ location, onSelect, interactive = true, label }) {
 }
 
 function getFileCategory(file) {
-  if (file.type.startsWith('image/')) return 'image'
-  if (file.type.startsWith('video/')) return 'video'
-  if (file.type.startsWith('audio/')) return 'audio'
-  if (file.type === 'application/pdf' || file.type.startsWith('text/')) return 'document'
+  const extension = file.name.split('.').pop()?.toLowerCase()
+  if (['jpeg', 'jpg', 'png', 'webp'].includes(extension)) return 'image'
+  if (extension === 'pdf') return 'document'
   return 'file'
 }
 
@@ -153,11 +152,7 @@ function FileTypeIcon({ file }) {
   const Icon =
     category === 'image'
       ? FileImage
-      : category === 'video'
-        ? FileVideo
-        : category === 'audio'
-          ? FileAudio
-          : FileText
+      : FileText
   return <Icon size={20} aria-hidden="true" />
 }
 
@@ -195,6 +190,7 @@ export default function ReportIncident({ onAdd }) {
   const [errors, setErrors] = useState({})
   const [submissionError, setSubmissionError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(null)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [draggingFiles, setDraggingFiles] = useState(false)
   const searchController = useRef(null)
@@ -206,6 +202,7 @@ export default function ReportIncident({ onAdd }) {
   const reviewDialog = useRef(null)
   const previousFocus = useRef(null)
   const attachmentsRef = useRef(attachments)
+  const submissionKey = useRef(null)
 
   const fetchGeocoder = useCallback(async (url, options = {}) => {
     const wait = Math.max(
@@ -479,6 +476,11 @@ export default function ReportIncident({ onAdd }) {
         messages.push(`${file.name} exceeds the 25 MB per-file limit.`)
         return
       }
+      const extension = file.name.split('.').pop()?.toLowerCase()
+      if (!extension || !ALLOWED_FILE_EXTENSIONS.has(extension)) {
+        messages.push(`${file.name} is unsupported. Attach JPG, JPEG, PNG, WEBP, or PDF files.`)
+        return
+      }
       const duplicate = next.some(
         (attachment) =>
           attachment.file.name === file.name &&
@@ -487,6 +489,10 @@ export default function ReportIncident({ onAdd }) {
       )
       if (duplicate) {
         messages.push(`${file.name} is already attached.`)
+        return
+      }
+      if (next.length >= MAX_ATTACHMENTS) {
+        messages.push(`A report can have at most ${MAX_ATTACHMENTS} evidence files.`)
         return
       }
       const category = getFileCategory(file)
@@ -529,6 +535,7 @@ export default function ReportIncident({ onAdd }) {
     setErrors({})
     setSubmissionError('')
     setReviewOpen(false)
+    submissionKey.current = null
   }
 
   const submit = async (event) => {
@@ -547,6 +554,7 @@ export default function ReportIncident({ onAdd }) {
 
     submissionInProgress.current = true
     setSubmitting(true)
+    setUploadProgress(null)
     setSubmissionError('')
 
     try {
@@ -570,9 +578,11 @@ export default function ReportIncident({ onAdd }) {
           type: file.type || 'Unknown file type',
         })),
         locationSource: location.source,
+        submissionKey: submissionKey.current || (submissionKey.current = globalThis.crypto?.randomUUID?.()
+          || `${Date.now()}-${Math.random().toString(36).slice(2)}`),
       }
 
-      await onAdd(report)
+      await onAdd(report, setUploadProgress)
       attachments.forEach((attachment) => {
         if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl)
       })
@@ -581,6 +591,7 @@ export default function ReportIncident({ onAdd }) {
       setLocationQuery('')
       setAttachments([])
       setReviewOpen(false)
+      submissionKey.current = null
     } catch (error) {
       setSubmissionError(
         error instanceof Error
@@ -601,7 +612,7 @@ export default function ReportIncident({ onAdd }) {
       <div className="incident-heading">
         <p className="incident-eyebrow">Help make road risks visible</p>
         <h1>Report a near-miss</h1>
-        <p>Share what happened and select the location. Your report stays in this frontend demonstration.</p>
+        <p>Share what happened, choose the incident location, and submit it to the NearMiss Atlas database.</p>
       </div>
 
       <form className="report-form incident-form" onSubmit={submit} noValidate>
@@ -773,7 +784,7 @@ export default function ReportIncident({ onAdd }) {
             <span className="form-section-number">03</span>
             <div>
               <h2 id="evidence-section-title">Supporting evidence <span className="optional-note">Optional</span></h2>
-              <p>Attach relevant files to help provide context. Files stay in this browser demonstration and are not uploaded.</p>
+              <p>Attach JPG, JPEG, PNG, WEBP, or PDF files (up to 25 MB each; 10 files maximum).</p>
             </div>
           </div>
 
@@ -783,6 +794,7 @@ export default function ReportIncident({ onAdd }) {
             id="evidence-files"
             type="file"
             multiple
+            accept=".jpg,.jpeg,.png,.webp,.pdf"
             onChange={(event) => {
               addFiles(event.target.files || [])
               event.target.value = ''
@@ -813,7 +825,7 @@ export default function ReportIncident({ onAdd }) {
           >
             <span className="file-drop-icon"><Upload size={20} /></span>
             <strong>Drag files here, or <span>browse files</span></strong>
-            <small>Images, video, audio, documents, and other file types · up to 25 MB each</small>
+            <small>JPG, JPEG, PNG, WEBP, or PDF · up to 25 MB each · 10 files maximum</small>
           </div>
           {fileError && <p className="file-error" role="alert"><AlertCircle size={15} />{fileError}</p>}
 
@@ -828,9 +840,7 @@ export default function ReportIncident({ onAdd }) {
                   <li className="attachment-item" key={attachment.id}>
                     {attachment.category === 'image' && attachment.previewUrl
                       ? <img className="attachment-preview" src={attachment.previewUrl} alt={`Preview of ${attachment.file.name}`} />
-                      : attachment.category === 'video' && attachment.previewUrl
-                        ? <video className="attachment-preview" src={attachment.previewUrl} controls aria-label={`Preview of ${attachment.file.name}`} />
-                        : <span className="attachment-file-icon"><FileTypeIcon file={attachment.file} /></span>}
+                      : <span className="attachment-file-icon"><FileTypeIcon file={attachment.file} /></span>}
                     <span className="attachment-details">
                       <strong title={attachment.file.name}>{attachment.file.name}</strong>
                       <small>{attachment.file.type || 'Unknown file type'} · {formatFileSize(attachment.file.size)}</small>
@@ -870,7 +880,13 @@ export default function ReportIncident({ onAdd }) {
               <div><span>Description</span><p>{form.description}</p></div>
               <div><span>Evidence</span><strong>{attachments.length ? `${attachments.length} file${attachments.length === 1 ? '' : 's'} attached` : 'No files attached'}</strong></div>
             </div>
-            <p className="local-only-note"><AlertCircle size={15} /> This frontend demo stores the report and selected files in browser memory only.</p>
+            <p className="local-only-note"><AlertCircle size={15} /> The selected coordinates and attached evidence will be saved with this report.</p>
+            {uploadProgress !== null && (
+              <div className="upload-progress" role="status">
+                <span>Uploading evidence… {uploadProgress}%</span>
+                <progress value={uploadProgress} max="100" aria-label="Evidence upload progress" />
+              </div>
+            )}
             {submissionError && <div className="form-message error" role="alert">{submissionError}</div>}
             <div className="review-actions">
               <button type="button" className="secondary-action" onClick={() => setReviewOpen(false)} disabled={submitting}>Back to edit</button>

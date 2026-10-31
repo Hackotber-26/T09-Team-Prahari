@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
-import { MapPin, ClipboardList, Paperclip, Search } from 'lucide-react'
+import { MapPin, ClipboardList, Paperclip, Search, Sparkles } from 'lucide-react'
 import { formatRelativeTime, formatSeverity, severityClass } from '../utils/reportDisplay'
+import { getSimilarReports } from '../services/api'
 
-export default function Reports({ reports = [] }) {
+export default function Reports({ reports = [], loading = false }) {
   const [query, setQuery] = useState('')
   const [severityFilter, setSeverityFilter] = useState('All severities')
+  const [similarity, setSimilarity] = useState({})
   const sortedReports = useMemo(() => [...reports]
     .filter((report) => {
       const normalizedQuery = query.trim().toLowerCase()
@@ -22,6 +24,19 @@ export default function Reports({ reports = [] }) {
     .sort(
     (a, b) => Number(b.reportedAt || 0) - Number(a.reportedAt || 0),
     ), [query, reports, severityFilter])
+
+  const findSimilar = async (reportId) => {
+    setSimilarity((current) => ({ ...current, [reportId]: { loading: true } }))
+    try {
+      const result = await getSimilarReports(reportId)
+      setSimilarity((current) => ({ ...current, [reportId]: { result } }))
+    } catch (error) {
+      setSimilarity((current) => ({
+        ...current,
+        [reportId]: { error: error.message || 'Semantic analysis is unavailable.' },
+      }))
+    }
+  }
 
   return (
     <section className="page reports-page">
@@ -51,7 +66,9 @@ export default function Reports({ reports = [] }) {
         </div>
       )}
 
-      {reports.length > 0 && sortedReports.length ? (
+      {loading && reports.length === 0 ? (
+        <div className="empty-state reports-empty" role="status">Loading reports…</div>
+      ) : reports.length > 0 && sortedReports.length ? (
         <ul className="reports-grid">
           {sortedReports.map((report) => (
             <li className="report-card" key={report.id}>
@@ -70,6 +87,51 @@ export default function Reports({ reports = [] }) {
                 <div className="report-evidence-list" aria-label="Attached evidence">
                   <Paperclip size={13} aria-hidden="true" />
                   <span>{report.attachments?.length || report.evidenceMetadata?.length} evidence file(s)</span>
+                </div>
+              )}
+              {report.attachments?.map((attachment) => (
+                <div className="report-evidence-item" key={attachment.id}>
+                  {attachment.type.startsWith('image/') && (
+                    <a href={attachment.url} rel="noreferrer" target="_blank">
+                      <img
+                        className="report-evidence-preview"
+                        src={attachment.url}
+                        alt={`Evidence: ${attachment.name}`}
+                        loading="lazy"
+                      />
+                    </a>
+                  )}
+                  <a
+                    className="report-evidence-download"
+                    href={attachment.url}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    {attachment.name} · {attachment.type}
+                  </a>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="text-action"
+                onClick={() => void findSimilar(report.id)}
+                disabled={similarity[report.id]?.loading}
+              >
+                <Sparkles size={14} aria-hidden="true" />
+                {similarity[report.id]?.loading ? 'Comparing descriptions…' : 'Find similar reports'}
+              </button>
+              {similarity[report.id]?.error && (
+                <p className="form-message error" role="alert">{similarity[report.id].error}</p>
+              )}
+              {similarity[report.id]?.result && (
+                <div className="semantic-results" aria-live="polite">
+                  <strong>{similarity[report.id].result.matches.length} similar description(s)</strong>
+                  {similarity[report.id].result.matches.map((match) => (
+                    <p key={match.report_id}>
+                      Report #{match.report_id} · {(match.similarity_score * 100).toFixed(1)}% · {match.description}
+                    </p>
+                  ))}
+                  <small>{similarity[report.id].result.notice}</small>
                 </div>
               )}
               <div className="report-card-footer">
