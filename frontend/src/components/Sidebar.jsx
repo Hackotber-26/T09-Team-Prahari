@@ -13,15 +13,19 @@ export default function Sidebar({ active, onSelect }) {
         <span className="sidebar-logo">NM</span>
         <span>NearMiss Atlas</span>
       </div>
-      {items.map((item) => (
-        <button
-          key={item.key}
-          className={active === item.key ? 'nav-item active' : 'nav-item'}
-          onClick={() => onSelect(item.key)}
-        >
-          {item.label}
-        </button>
-      ))}
+      <nav className="sidebar-nav" aria-label="Primary navigation">
+        {items.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            className={active === item.key ? 'nav-item active' : 'nav-item'}
+            aria-current={active === item.key ? 'page' : undefined}
+            onClick={() => onSelect(item.key)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
     </aside>
   )
 }

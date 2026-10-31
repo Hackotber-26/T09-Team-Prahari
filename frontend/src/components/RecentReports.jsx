@@ -1,24 +1,75 @@
-import { recentReports } from '../data/sample'
 
-const sevColor = { Low: '#94A3B8', Medium: '#F59E0B', High: '#EF4444', Critical: '#EF4444' }
+import { formatSeverity, severityClass } from '../utils/reportDisplay'
 
-export default function RecentReports() {
+export default function RecentReports({ reports = [] }) {
+  const recentReports = [...reports]
+    .sort(
+      (a, b) =>
+        new Date(b.reportedAt || b.createdAt || 0) -
+        new Date(a.reportedAt || a.createdAt || 0)
+    )
+    .slice(0, 5)
+
   return (
-    <div className="card">
-      <h2 className="card-title">Recent Reports</h2>
-      <ul className="report-list">
-        {recentReports.map((r) => (
-          <li key={r.id} className="report-item">
-            <div>
-              <div className="report-location">{r.location}</div>
-              <div className="report-meta">{r.type} · {r.time}</div>
-            </div>
-            <span className="sev-badge" style={{ color: sevColor[r.severity], borderColor: sevColor[r.severity] }}>
-              {r.severity}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <section className="recent-reports">
+      <div className="panel-heading">
+        <div>
+          <h2>Recent Reports</h2>
+          <p>Latest community-submitted incidents</p>
+        </div>
+      </div>
+
+      {recentReports.length === 0 ? (
+        <div className="panel-empty">
+          No reports have been submitted yet.
+        </div>
+      ) : (
+        <div className="recent-list">
+          {recentReports.map((report, index) => {
+            const severity = formatSeverity(
+              report.priority || report.severityLevel || report.severity
+            )
+            const priorityClass =
+              severity.toLowerCase() === 'critical'
+                ? 'critical'
+                : severityClass(severity)
+
+            return (
+              <article
+                className="recent-report-item"
+                key={report.id || report._id || index}
+                style={{
+                  animationDelay: `${index * 90}ms`,
+                }}
+              >
+                <div className="recent-report-marker">
+                  {index + 1}
+                </div>
+
+                <div className="recent-report-details">
+                  <h3>
+                    {report.location ||
+                      report.locationName ||
+                      'Unknown location'}
+                  </h3>
+
+                  <p>
+                    {report.incidentType ||
+                      report.type ||
+                      'Near-miss incident'}
+                  </p>
+                </div>
+
+                <span
+                  className={`priority-badge priority-${priorityClass}`}
+                >
+                  {severity}
+                </span>
+              </article>
+            )
+          })}
+        </div>
+      )}
+    </section>
   )
 }
