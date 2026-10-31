@@ -1,5 +1,6 @@
 const items = [
   { key: 'dashboard', label: 'Dashboard' },
+  { key: 'report', label: 'Report Incident' },
   { key: 'reports', label: 'Reports' },
   { key: 'hotspots', label: 'Hotspots' },
   { key: 'about', label: 'About' },
